@@ -1,71 +1,102 @@
 """Resources for generating Nexar tokens."""
-import os, re, requests
 import base64
+import getpass
 import hashlib
 import http.server
+import json
+import os
+import re
 import webbrowser
-import getpass
+from functools import wraps
+from pathlib import Path
+from typing import Sequence
 
+import requests
 from requests_oauthlib import OAuth2Session
-from localService import handlerFactory
+
+
+from .localService import handlerFactory
+from .errors import NexarClientUnauthenticatedError
 
 HOST_NAME = "localhost"
 PORT = 3000
 REDIRECT_URI = f"http://{HOST_NAME}:{PORT}/login"
 AUTHORITY_URL = "https://identity.nexar.com/connect/authorize"
 PROD_TOKEN_URL = "https://identity.nexar.com/connect/token"
+ALTIUM_CONFIG_DIR = (Path.home() / '.altium')
 
 
-def get_token(client_id, client_secret, scopes, refresh_token = None):
+def store_token(enabled = True):
+    def wrapped(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            token = f(*args, **kwargs)
+            ALTIUM_CONFIG_DIR.mkdir(exist_ok = True, parents=True)
+            if enabled:
+                (ALTIUM_CONFIG_DIR / '.token.json').write_text(json.dumps(token))
+            return token
+        return wrapper
+    return wrapped
+
+@store_token(enabled=True)
+def get_token(client_id: str, client_secret: str, scopes: Sequence[str] = [], refresh_token: str | None = None):
     """Return the Nexar token from the client_id and client_secret provided."""
 
-    if not client_id or not client_secret:
-        raise Exception("client_id and/or client_secret are empty")
-    if not scopes:
-        raise Exception("scope is empty")
+    if refresh_token is None:
+        try:
+            refresh_token = json.loads(Path(ALTIUM_CONFIG_DIR / '.token.json').read_text())['refresh_token']
+        except:
+            pass
+
+    if client_id is None:
+        raise NexarClientUnauthenticatedError("'client_id' must not be unset")
+    if client_secret is None:
+        raise NexarClientUnauthenticatedError("'client_secret' must not be unset")
+    if scopes is None:
+        raise NexarClientUnauthenticatedError("'scope' must not be empty")
 
     if refresh_token:
         return get_refresh_token(client_id, client_secret, scopes, refresh_token)
 
+    scopes = list(scopes)
     if (scopes != ["supply.domain"]):
         return get_token_with_login(client_id, client_secret, scopes)
 
     token = {}
-    try:
-        token = requests.post(
-            url=PROD_TOKEN_URL,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "scope": " ".join(scopes)
-            },
-            allow_redirects=False,
-        ).json()
+    token_response = requests.post(
+        url=PROD_TOKEN_URL,
+        data={
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": " ".join(scopes)
+        },
+        allow_redirects=False,
+    )
+    token_response.raise_for_status()
+    token = token_response.json()
 
-    except Exception:
-        raise
 
     return token
 
-def get_refresh_token(client_id, client_secret, scopes, refresh_token):
+def get_refresh_token(client_id: str, client_secret: str, scopes: Sequence[str], refresh_token: str | None):
     """Return the Nexar token from a refresh token."""
 
     token = {}
-    try:
-        token = requests.post(
-            url=PROD_TOKEN_URL,
-            data={
-                "grant_type": "refresh_token",
-                "refresh_token": refresh_token,
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "scope": " ".join(scopes)
-            },
-        ).json()
+    token_response = requests.post(
+        url=PROD_TOKEN_URL,
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": " ".join(scopes)
+        },
+    )
 
-    except Exception:
-        raise
+    token_response.raise_for_status()
+    token = token_response.json()
+
 
     return token
 
@@ -90,37 +121,36 @@ def get_token_with_login(client_id, client_secret, scopes):
         code_challenge_method="S256",
     )
 
-    try:
-        # Start the local service
-        code = []
-        httpd = http.server.HTTPServer((HOST_NAME, PORT), handlerFactory(code, state))
+    # Start the local service
+    code = []
+    httpd = http.server.HTTPServer((HOST_NAME, PORT), handlerFactory(code, state))
 
-        # Request login page and look for code response
-        webbrowser.open_new(authorization_url.replace("+", "%20"))
+    # Request login page and look for code response
+    webbrowser.open_new(authorization_url.replace("+", "%20"))
 
-        while (len(code) == 0):
-            httpd.handle_request()
-        httpd.server_close()
+    while (len(code) == 0):
+        httpd.handle_request()
+    httpd.server_close()
 
-        if (len(code) == 2):
-            raise Exception(code[1])
+    if (len(code) == 2):
+        raise Exception(code[1])
 
-        # Exchange code for token
-        token = requests.post(
-            url=PROD_TOKEN_URL,
-            data={
-                "grant_type": "authorization_code",
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "redirect_uri": REDIRECT_URI,
-                "code": code[0],
-                "code_verifier": code_verifier,
-            },
-            allow_redirects=False,
-        ).json()
+    # Exchange code for token
+    token_response = requests.post(
+        url=PROD_TOKEN_URL,
+        data={
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": REDIRECT_URI,
+            "code": code[0],
+            "code_verifier": code_verifier,
+        },
+        allow_redirects=False,
+    )
+    token_response.raise_for_status()
+    token = token_response.json()
 
-    except Exception:
-        raise
 
     return token
 
@@ -133,19 +163,18 @@ def get_token_with_resource_password(client_id, client_secret):
     password = getpass.getpass("Enter password: ")
 
     token = {}
-    try:
-        token = requests.post(
-            url=PROD_TOKEN_URL,
-            data={
-                "grant_type": "password",
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "username": username,
-                "password": password,
-            },
-        ).json()
+    token_response = requests.post(
+        url=PROD_TOKEN_URL,
+        data={
+            "grant_type": "password",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "username": username,
+            "password": password,
+        },
+    )
+    token_response.raise_for_status()
+    token = token_response.json()
 
-    except Exception:
-        raise
 
     return token

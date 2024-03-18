@@ -1,8 +1,6 @@
 '''Example query for workspace info.'''
-import os, sys, json
-#from ..NexarClient.nexarClient import NexarClient
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(SCRIPT_DIR, '..', 'NexarClient'))
+import os 
+
 from nexarClient import NexarClient
 
 gqlQuery = '''
