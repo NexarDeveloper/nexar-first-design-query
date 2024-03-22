@@ -1,7 +1,5 @@
-import json
 import logging
 import os
-from pathlib import Path
 
 from NexarClient.nexarClient import NexarClient
 
@@ -48,15 +46,25 @@ query library {{
 '''
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format="[%(levelname)s - %(asctime)s - %(name)s - %(filename)s - %(lineno)d ]: %(message)s")
+
     nexar = get_client()
+
     workspaces = nexar.get_query(workspacesQuery)['desWorkspaces']
-    prod_workspace_url = [ workspace for workspace in workspaces if workspace['name'] == 'Lunar Energy Production' ][0]['url']
-    result = nexar.get_query(library_query(prod_workspace_url, 'first: 100'))["desLibrary"]["components"]
+    workspace_name = os.environ['NEXAR_WORKSPACE_NAME']
+    try:
+      prod_workspace_url = [ workspace for workspace in workspaces if workspace['name'] == workspace_name ][0]['url']
+    except IndexError as e:
+      logging.error(f'Failed to find workspace with name {workspace_name}')
+      logging.exception(e)
+    else:
+      result = nexar.get_query(library_query(prod_workspace_url, 'first: 100'))["desLibrary"]["components"]
 
-    while (pageInfo:= result.get('pageInfo', {})):
-      logging.debug('pageInfo', pageInfo)
+      while (pageInfo:= result.get('pageInfo', {})):
+        logging.debug('pageInfo', pageInfo)
 
-      if pageInfo.get('hasNextPage', False) and (endCursor:=pageInfo.get('endCursor')) is not None:
-        break
+        endCursor = pageInfo.get('endCursor')
 
-      result = nexar.get_query(library_query(prod_workspace_url,f'after: "{endCursor}"'))["desLibrary"]["components"]
+        if pageInfo.get('hasNextPage', False) and endCursor is not None:
+          break
+
+        result = nexar.get_query(library_query(prod_workspace_url,f'after: "{endCursor}"'))["desLibrary"]["components"]
