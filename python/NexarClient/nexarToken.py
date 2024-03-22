@@ -49,9 +49,9 @@ def get_token(client_id: str, client_secret: str, scopes: Sequence[str] = [], re
             pass
 
     if client_id is None:
-        raise NexarClientUnauthenticatedError("'client_id' must not be unset")
+        raise NexarClientUnauthenticatedError("'client_id' must be set")
     if client_secret is None:
-        raise NexarClientUnauthenticatedError("'client_secret' must not be unset")
+        raise NexarClientUnauthenticatedError("'client_secret' must be set")
     if scopes is None:
         raise NexarClientUnauthenticatedError("'scope' must not be empty")
 
