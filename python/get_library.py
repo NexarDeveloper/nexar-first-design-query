@@ -60,8 +60,3 @@ if __name__ == '__main__':
         break
 
       result = nexar.get_query(library_query(prod_workspace_url,f'after: "{endCursor}"'))["desLibrary"]["components"]
-
-
-
-
-
