@@ -1,14 +1,22 @@
 """Resources for making Nexar requests."""
-import os, requests, re
 import base64
 import json
+import logging
+import os
+import re
 import time
 from typing import Callable, Dict, Iterator
+
+import requests
 from requests_toolbelt import MultipartEncoder
-from nexarToken import get_token
+
+from .nexarToken import get_token
+from .errors import NexarClientBadRequestError, NexarClientUploadError
 
 NEXAR_URL = "https://api.nexar.com/graphql"
 NEXAR_FILE_URL = "https://files.nexar.com/Upload/WorkflowAttachment"
+
+logger = logging.getLogger('NexarClient')
 
 def decodeJWT(token):
     return json.loads(
@@ -16,7 +24,7 @@ def decodeJWT(token):
     )
 
 class NexarClient:
-    def __init__(self, id, secret, scopes = ['supply.domain']) -> None:
+    def __init__(self, id, secret, scopes = ['supply.domain'], refresh_token=None) -> None:
         #scopes = ['supply.domain', 'design.domain', 'user.access', 'offline_access']
         self.id = id
         self.secret = secret
@@ -25,7 +33,7 @@ class NexarClient:
         self.s = requests.session()
         self.s.keep_alive = False
 
-        self.token = get_token(id, secret, scopes)
+        self.token = get_token(id, secret, scopes, refresh_token)
         self.s.headers.update({"token": self.token.get('access_token')})
         self.exp = decodeJWT(self.token.get('access_token')).get('exp')
 
@@ -37,21 +45,19 @@ class NexarClient:
 
     def get_query(self, query: str, variables: Dict = {}) -> dict:
         """Return Nexar response for the query."""
-        try:
-            self.check_exp()
-            r = self.s.post(
-                self.api_url,
-                json={"query": query, "variables": variables},
-            )
-
-        except Exception as e:
-            print(e)
-            raise Exception("Error while getting Nexar response")
+        logger.info(f"POST - {self.api_url}")
+        logger.debug(f"POST - {self.api_url}:\n{query}{variables}")
+        self.check_exp()
+        r = self.s.post(
+            self.api_url,
+            json={"query": query, "variables": variables},
+        )
 
         response = r.json()
         if ("errors" in response):
-            for error in response["errors"]: print(error["message"])
-            raise SystemExit
+            logger.error(response)
+            raise NexarClientBadRequestError
+        logger.debug(f'POST - {self.api_url} - 200: {response}')
 
         return response["data"]
 
@@ -75,8 +81,8 @@ class NexarClient:
             )
 
         except Exception as e:
-            print(e)
-            raise Exception("Error while uploading file to Nexar")
+            logger.exception(e)
+            raise NexarClientUploadError
 
         return r.text
 

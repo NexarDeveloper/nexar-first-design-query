@@ -40,6 +40,12 @@ def NexarPage(title, message):
     <h1 class="title">{title}</h1>
     <p class="normal">{message}.</p>
   </div>
+  <script>
+    function autoClose(){{
+        window.close();
+    }}
+    setTimeout(autoClose, 3000);
+  </script>
 </body>
 </html>
 """
@@ -78,7 +84,7 @@ def handlerFactory(code, state):
             s.send_response(200)
             s.send_header("Content-type", "text/html")
             s.end_headers()
-            s.wfile.write(NexarPage("Welcome to Nexar","You can now return to the application").encode())
+            s.wfile.write(NexarPage("Welcome to Nexar","You can now return to the application. This window will close soon.").encode())
             code.append(response["code"][0])
 
     return MyHandler
