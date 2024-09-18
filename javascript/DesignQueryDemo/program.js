@@ -6,7 +6,7 @@ const clientSecret = process.env.NEXAR_CLIENT_SECRET ??
 const nexar = new nx.NexarClient(clientId, clientSecret, nx.NexarClient.scopes.design)
 
 const gqlQuery = `query Workspaces {
-    desWorkspaces {
+    desWorkspaceInfos {
       url
       name
       description
@@ -17,7 +17,7 @@ const gqlQuery = `query Workspaces {
   }`
 
 let workspaces = nexar.query(gqlQuery)
-    .then(response => response.data.desWorkspaces)
+    .then(response => response.data.desWorkspaceInfos)
 
 // This second query uses the node (paged) interface.
 // To iterate through the pages we need a variable to set the cursor (after: $var)
