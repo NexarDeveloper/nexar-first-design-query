@@ -7,7 +7,7 @@ from nexarClient import NexarClient
 
 gqlQuery = '''
 query Workspaces {
-    desWorkspaces {
+    desWorkspaceInfos {
       url
       name
       description
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     clientSecret = os.environ['NEXAR_CLIENT_SECRET']
     nexar = NexarClient(clientId, clientSecret, ['design.domain', 'user.access', 'offline_access'])
 
-    workspaces = nexar.get_query(gqlQuery)['desWorkspaces']
+    workspaces = nexar.get_query(gqlQuery)['desWorkspaceInfos']
     for workspace in workspaces:
         variables = {
             'url': workspace['url']
