@@ -348,3 +348,14 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+# Vim
+.vim/*
+
+# Nix
+shell.nix
+shellHook.sh
+
+# Data
+**/.env
+**/.token.json
