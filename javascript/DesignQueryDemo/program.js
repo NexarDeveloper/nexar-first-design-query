@@ -1,9 +1,7 @@
-const nx = require('../NexarClient/nexarClient')
-const clientId = process.env.NEXAR_CLIENT_ID ??
-    (() => {throw new Error("Please set environment variable 'NEXAR_CLIENT_ID'")})()
-const clientSecret = process.env.NEXAR_CLIENT_SECRET ??
-    (() => {throw new Error("Please set environment variable 'NEXAR_CLIENT_SECRET'")})()
-const nexar = new nx.NexarClient(clientId, clientSecret, nx.NexarClient.scopes.design)
+const nx = require('../AltiumClient/apiClient')
+const pat = process.env.A365_PAT ??
+    (() => {throw new Error("Please set environment variable 'A365_PAT'")})()
+const client = new nx.AltiumClient(pat, nx.AltiumClient.scopes.design)
 
 const gqlQuery = `query Workspaces {
     desWorkspaceInfos {
@@ -16,7 +14,7 @@ const gqlQuery = `query Workspaces {
     }
   }`
 
-let workspaces = nexar.query(gqlQuery)
+let workspaces = client.query(gqlQuery, "/napi/gateway/graphql")
     .then(response => response.data.desWorkspaceInfos)
 
 // This second query uses the node (paged) interface.
@@ -38,11 +36,11 @@ const gqlQuery2 = `query Projects($url: String!, $end: String) {
 workspaces
     .then(async workspaces => {
         for (workspace of workspaces) {
-            nexar.host = workspace.location.apiServiceUrl
-            console.log(`projects for workspace: ${workspace.name} (${nexar.hostName})`)
+            client.host = workspace.location.apiServiceUrl
+            console.log(`projects for workspace: ${workspace.name} (${client.hostName})`)
 
-            let gqlVariables = {'url': workspace    .url}
-            let projects = nexar.pageGen(gqlQuery2, gqlVariables, 'end', (data) => data.desProjects)
+            let gqlVariables = {'url': workspace.url}
+            let projects = client.pageGen(gqlQuery2, "/svc/napi/gateway/graphql", gqlVariables, 'end', (data) => data.desProjects)
 
             for await (const page of projects) {
                 for (const project of page) {

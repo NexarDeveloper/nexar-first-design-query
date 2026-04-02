@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const { spawn } = require("child_process");
 const os = require("os");
 
-nexarPage = (title, message) => `
+a365Page = (title, message) => `
     <html>
     <head>
       <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet" type="text/css">
@@ -45,16 +45,13 @@ nexarPage = (title, message) => `
     </html>
     `;
 const TOKEN_OPTIONS = {
-  hostname: "identity.nexar.com",
+  hostname: "auth.altium.com",
   path: "/connect/token",
   method: "POST",
   headers: {
     "Content-Type": "application/x-www-form-urlencoded",
   },
 };
-const PORT = 3000;
-const REDIRECT_URI = `http://localhost:${PORT}/login`;
-const AUTHORITY_URL = "https://identity.nexar.com/connect/authorize";
 
 function launchBrowser(auth_request) {
   switch (os.platform()) {
@@ -68,12 +65,13 @@ function launchBrowser(auth_request) {
 }
 
 function decodeJWT(jwt) {
-  return JSON.parse(
+  let json = JSON.parse(
     Buffer.from(
       jwt.split(".")[1].replace("-", "+").replace("_", "/"),
       "base64"
     ).toString("binary")
   );
+  return json;
 }
 
 function getRequest(options, data) {
@@ -111,132 +109,34 @@ function getRequest(options, data) {
   });
 }
 
-class NexarClient {
-  #accessToken;
+class AltiumClient {
   #exp;
-  #id;
-  #secret;
+  #accessToken;
+  #pat;
   #scope;
-  hostName = "api.nexar.com";
+  hostName = "usw2.dev-365.altium.com"; //"dev-365.altium.com/"; // "eur.365.altium.com";
   static scopes = {
     supply: "supply.domain",
     design: "openid profile email design.domain user.access offline_access",
   };
 
   /**
-   * Client for the Nexar API to manage authorization and requests.
-   * @param {string} id - the client id assigned to a Nexar application.
-   * @param {string} secret - the client secret assigned to a Nexar application.
+   * Client for the Altium 365 API to manage authorization and requests.
+   * @param {string} pat - personal access token.
    * @param {string} [scope] - the resources required for authorization
    */
 
-  constructor(id, secret, scope = NexarClient.scopes.supply) {
-    this.#id = id;
-    this.#secret = secret;
+  constructor(pat, scope = AltiumClient.scopes.supply) {
+    this.#pat = pat;
     this.#scope = scope;
   }
 
   set host(name) {
-    this.hostName = name.replace(/^https:\/\//, "").replace(/\/graphql$/, "");
-  }
-
-  #getUserAuthCode(id, code_challenge, scope) {
-    let auth_request = new URL(AUTHORITY_URL);
-    const auth_params = new URLSearchParams({
-      response_type: "code",
-      client_id: id,
-      redirect_uri: REDIRECT_URI,
-      scope: scope,
-      state: crypto.randomBytes(16).toString("hex"),
-      code_challenge: code_challenge,
-      code_challenge_method: "S256",
-    });
-    auth_request.search = auth_params.toString();
-
-    let client;
-    let server = http.createServer();
-    server.listen(PORT);
-
-    return new Promise((resolve, reject) => {
-      server.on("request", (req, res) => {
-        let url = new URL(req.url, `http://${req.headers.host}`);
-
-        switch (url.pathname) {
-          case "/login":
-            let error;
-            if (url.searchParams.get("state") != auth_params.get("state")) {
-              error = new Error("Unverified state");
-            } else if (!url.searchParams.has("code")) {
-              error = new Error("Code not returned");
-            }
-
-            if (error) {
-              res.writeHead(400);
-              res.end(nexarPage("Authorization Failed!", error.message));
-              reject(error);
-            } else {
-              res.writeHead(200);
-              res.end(
-                nexarPage(
-                  "Welcome to Nexar",
-                  "You can now return to the application."
-                )
-              );
-              server.close();
-              resolve(url.searchParams.get("code"));
-            }
-            break;
-          default:
-            res.writeHead(404);
-            res.end();
-        }
-      });
-
-      // open browser winow to initiate code request
-      client = launchBrowser(auth_request.href);
-    });
-  }
-
-  #getAccessTokenFromCode(id, secret, code_verifier, code) {
-    const data = new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: id,
-      client_secret: secret,
-      code: code,
-      code_verifier: code_verifier,
-      redirect_uri: REDIRECT_URI,
-    });
-
-    return getRequest(TOKEN_OPTIONS, data.toString());
-  }
-
-  #getAccessToken(id, secret, scope) {
-    if (scope == "supply.domain") {
-      const data = new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: id,
-        client_secret: secret,
-        scope: scope,
-      });
-
-      return getRequest(TOKEN_OPTIONS, data.toString());
-    }
-
-    let urlSafe = (buffer) =>
-      buffer
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=/g, "");
-
-    let pkceVerifier = urlSafe(crypto.randomBytes(40));
-    let pkceChallenge = urlSafe(
-      crypto.createHash("sha256").update(pkceVerifier).digest()
-    );
-
-    return this.#getUserAuthCode(id, pkceChallenge, scope).then((code) => {
-      return this.#getAccessTokenFromCode(id, secret, pkceVerifier, code);
-    });
+    this.hostName = name.replace(/^https:\/\//, "")
+                        .replace(/\/graphql$/, "")
+                        .replace(/\/gateway$/, "")
+                        .replace(/\/napi$/, "")
+                        .replace(/\/svc$/, "");
   }
 
   #refreshToken(token) {
@@ -244,22 +144,21 @@ class NexarClient {
       const data = new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: token.refresh_token,
-        client_id: this.#id,
-        client_secret: this.#secret,
+        client_id: this.#pat,
         scope: this.#scope,
       });
 
       return getRequest(TOKEN_OPTIONS, data.toString());
     }
 
-    return this.#getAccessToken(this.#id, this.#secret, this.#scope);
+    return new Promise(() => ""); // this.#getAccessToken(this.#id, this.#secret, this.#scope);
   }
 
   #checkTokenExp() {
     this.#exp =
       this.#exp ||
       this.#accessToken.then(
-        (token) => decodeJWT(token.access_token)?.exp * 1000
+        (token) => decodeJWT(token)?.exp * 1000
       );
 
     return this.#exp.then((exp) => {
@@ -275,24 +174,24 @@ class NexarClient {
   }
 
   /**
-   * Make a request to the Nexar API
+   * Make a request to the Altium 365 API
    * @param {string} gqlQuery - graphQL string containing the query/mutation.
    * @param {object} variables - key/value pairs for variables used in the gqlQuery.
-   * @returns {object} - The Nexar API response
+   * @returns {object} - The Altium 365 API response
    */
 
-  query(gqlQuery, variables) {
-    this.#accessToken =
-      this.#accessToken ||
-      this.#getAccessToken(this.#id, this.#secret, this.#scope);
-
+  query(gqlQuery, path, variables) {
+      this.#accessToken =
+          this.#accessToken ||
+          Promise.resolve(this.#pat);
+      
     return this.#checkTokenExp().then((token) => {
       const options = {
         hostname: this.hostName,
-        path: "/graphql",
+        path: path,
         method: "POST",
         headers: {
-          Authorization: "Bearer " + token.access_token,
+          Authorization: "Bearer " + token,
           "Content-Type": "application/json",
         },
       };
@@ -315,10 +214,10 @@ class NexarClient {
    * @yields {object} - a page of the graphQL Type implementing a node interface
    */
 
-  async *pageGen(gqlQuery, gqlVariables, pageKey, pageSelect) {
+  async *pageGen(gqlQuery, path, gqlVariables, pageKey, pageSelect) {
     let pageInfo = { hasNextPage: true };
     while (pageInfo.hasNextPage) {
-      const response = await this.query(gqlQuery, gqlVariables);
+      const response = await this.query(gqlQuery, path, gqlVariables);
 
       pageInfo = pageSelect(response.data).pageInfo;
       gqlVariables[pageKey] = pageInfo.endCursor;
@@ -328,4 +227,4 @@ class NexarClient {
   }
 }
 
-module.exports = { NexarClient };
+module.exports = { AltiumClient };
