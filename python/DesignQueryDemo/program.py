@@ -1,41 +1,26 @@
 '''Example query for workspace info.'''
 import os, sys
 #from ..AltiumClient.apiClient import AltiumClient
+#from ..Queries.* import query strings
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(SCRIPT_DIR, '..', 'AltiumClient'))
 from apiClient import AltiumClient
 
-gqlQuery = '''
-query Workspaces {
-    desWorkspaceInfos {
-      workspaceId  
-      url
-      name
-      description
-      location {
-        apiServiceUrl
-      }
-    }
-  }'''
+sys.path.append(os.path.join(SCRIPT_DIR, '..', 'Queries'))
+from workspace import query_workspace_DesWorkspaceInfos
+from project import query_project_desProjects
+from project import query_project_desProjectById
 
-gqlQuery2 = '''
-query Projects($url: String!, $end: String) {
-    desProjects(workspaceUrl: $url, first: 10, after: $end) {
-      nodes {
-        id
-        name
-        description
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-    }
-  }'''
+sys.path.append(os.path.join(SCRIPT_DIR, '..', 'Helpers'))
+from utils import print_delimiter_1
+from utils import print_delimiter_2
+from utils import print_nested
 
 if __name__ == '__main__':
 
     print("Altium 365 platform-api-first-design-query")
+    print_delimiter_1()
     
     clientId = None
     clientSecret = None
@@ -52,7 +37,7 @@ if __name__ == '__main__':
     
     client = AltiumClient(clientId, clientSecret, refreshToken, pat, ['design.domain', 'user.access', 'offline_access'])
 
-    workspaces = client.get_query(gqlQuery)['desWorkspaceInfos']
+    workspaces = client.get_query(query_workspace_DesWorkspaceInfos)['desWorkspaceInfos']
     grid_prefix = "grid:global::platform:workspace/"
     for workspace in workspaces:
         if not client.token_workspace_scope_match(workspace['workspaceId'].removeprefix(grid_prefix)):
@@ -63,10 +48,29 @@ if __name__ == '__main__':
         }
         client.api_url = workspace['location']['apiServiceUrl']
         print(f'projects for workspace: {workspace["name"]} ({client.api_url})')
+        print_delimiter_1()
 
-        for page in client.NodeIter(gqlQuery2, variables, lambda x: x['desProjects']):
+        first_project = None
+        for page in client.NodeIter(query_project_desProjects, variables, lambda x: x['desProjects']):
             for project in page:
+                if first_project is None:
+                    first_project = project
+                    
                 print(f'Project Id: {project["id"]}')
                 print(f'Name: {project["name"]}')
                 print(f'Description: {project["description"]}')
                 print()
+                print_delimiter_2()
+
+        if first_project is not None:
+            print(f'Fetching details of the first project: {first_project["name"]}\n')
+            print_delimiter_1()
+            
+            variables = {
+                'id': first_project["id"]
+            }
+            
+            project_details = client.get_query(query_project_desProjectById, variables)['desProjectById']
+            if project_details is not None:
+                print_nested(project_details)
+        
