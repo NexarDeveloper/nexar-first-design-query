@@ -3,7 +3,7 @@ from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 
-def NexarPage(title, message):
+def A365Page(title, message):
   return f"""
 <html>
 <head>
@@ -71,14 +71,14 @@ def handlerFactory(code, state):
                 s.send_response(400)
                 s.send_header("Content-type", "text/html")
                 s.end_headers()
-                s.wfile.write(NexarPage("Authorization Failed!",error).encode())
+                s.wfile.write(A365Page("Authorization Failed!",error).encode())
                 code.extend([None, error])
                 return
 
             s.send_response(200)
             s.send_header("Content-type", "text/html")
             s.end_headers()
-            s.wfile.write(NexarPage("Welcome to Nexar","You can now return to the application").encode())
+            s.wfile.write(A365Page("Welcome to Altium 365","You can now return to the application").encode())
             code.append(response["code"][0])
 
     return MyHandler
