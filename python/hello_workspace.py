@@ -1,4 +1,7 @@
-import requests
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'AltiumClient'))
+
+from standaloneApiClient import StandaloneAltiumClient
 
 if __name__ == '__main__':
     # *** Paste your Personal Access Token and Workspace URL here. No token? Visit https://developer.altium.com ***
@@ -7,39 +10,20 @@ if __name__ == '__main__':
     query = '''
         query Projects {
             desProjects {
-              nodes {
-                name
-                description
-                id
-                updatedAt
-                variantCount
-                url
-              }
+                nodes {
+                    name
+                    description
+                    id
+                    updatedAt
+                    variantCount
+                    url
+                }
             }
           }'''
 
-    s = requests.session()
-    s.keep_alive = False
-    workspaceUrl = WORKSPACE_URL.rstrip('/')
-    apiUrl = f'{workspaceUrl}/svc/napi/gateway/graphql'
+    response = StandaloneAltiumClient.execute_query(PAT, WORKSPACE_URL, query)
 
     print('Altium 365 API - Hello Workspace! - First project...\n======================================================================\n')
-
-    try:
-        r = s.post(
-            apiUrl,
-            json={'query': query},
-            headers={'Authorization': f'Bearer {PAT}'}
-        )
-        response = r.json()
-    except Exception as e:
-        print(e)
-        raise Exception('Error while getting API response. Make sure you paste a valid Personal Access Token into \'pat\'')
-
-    if 'errors' in response:
-        for error in response['errors']: print(error["message"])
-        raise SystemExit
-
     if response['data']['desProjects']['nodes']:
         first_project = response['data']['desProjects']['nodes'][0]
         print(f'        name: {first_project["name"]}\n'
