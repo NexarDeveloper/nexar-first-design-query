@@ -1,22 +1,21 @@
 import os, sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(SCRIPT_DIR, '..', 'AltiumClient'))
+sys.path.append(os.path.join(SCRIPT_DIR, '..', '..', 'AltiumClient'))
 from apiClient import AltiumClient
 
-sys.path.append(os.path.join(SCRIPT_DIR, '..', 'Queries'))
 from workspace import query_workspace_DesWorkspaceInfos
 from project import query_project_desProjects
 from project import query_project_desProjectById
 
-sys.path.append(os.path.join(SCRIPT_DIR, '..', 'Helpers'))
+sys.path.append(os.path.join(SCRIPT_DIR, '..', '..', 'Helpers'))
 from utils import print_delimiter_1
 from utils import print_delimiter_2
 from utils import print_nested
 
 if __name__ == '__main__':
 
-    print("Altium 365 platform-api-first-design-query")
+    print("Altium 365 platform-api-first-query")
     print_delimiter_1()
     
     clientId = None

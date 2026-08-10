@@ -1,31 +1,51 @@
-# platform-api-first-design-query
-[365.altium.com]: https://365.altium.com/
+# platform-api-first-query — Python examples
 
-Simple console app which illustrates a number of queries in Altium 365 
-- Hello Workspace basic demo that gets metadate from your Altium 365 workspace
-- Project demo which looks up project details from your Altium 365 workspace.
+Simple console apps which illustrate a number of queries in Altium 365:
+- Hello Workspace basic example that gets metadata from your Altium 365 workspace
+- a number of use cases (under `UseCases/`), such as looking up project revisions
+  and parameters from your Altium 365 workspace.
 
-# Prerequisites
+See the [root README](../README.md) for prerequisites and how to register your
+Altium 365 application. This README covers running the Python examples once you
+have your credentials.
 
-You need your Altium Live credentials and have to be a member of at least one Altium 365 workspace.
+## Setup
 
-In addition, you need an application at [365.altium.com].
+From the `python/` directory, create and activate a virtual environment and
+install the dependencies:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
 ## Hello Workspace
-When you create your application:
+
+Using the application you registered:
 - generate a Personal Access Token (PAT), by unticking the Refresh Token option
-- paste that into `PAT` variable in `hello_workspace.py`
+- paste that into the `PAT` variable in `hello_workspace.py`
 - make sure you point `WORKSPACE_URL` to your workspace
 
-## Project demo
+Then run it:
 
-When you create your application, you have two options regarding the token to use in `project_demo.py`:
-- either generate a Personal Access Token (PAT), by unticking the Refresh Token option
-- or generate a triplet: Client ID, Client Secret and Refresh Token, by ticking the Refresh Token option 
+```bash
+python hello_workspace.py
+```
 
-Depending on which option chosen above, make sure you have the right environment variables set before you run `platform-api-first-design-query`:
+## Project revisions and parameters use case
+
+Depending on which authentication option you chose when registering your
+application (see the [root README](../README.md)), make sure you have the right
+environment variables set before you run the use case:
 - either: `A365_PAT`
 - or: `A365_CLIENT_ID`, `A365_CLIENT_SECRET` and `A365_REFRESH_TOKEN`
+
+Then run it:
+
+```bash
+python UseCases/ProjectRevisionsAndReleases/project_revisions_and_parameters.py
+```
 
 ### Overriding default endpoints
 Default endpoints are provided for A365 GraphQL API and Refresh Token.
